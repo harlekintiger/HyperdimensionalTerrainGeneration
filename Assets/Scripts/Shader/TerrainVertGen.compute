@@ -1,0 +1,45 @@
+﻿#pragma kernel TerVertGen
+#include "Assets\Zird Party\ComputeShaderExamples\Noise\SimplexNoise3D.compute"
+
+
+RWStructuredBuffer<float3> mesh;
+float4x4 localToWorldMatrix;
+
+
+float noise3D(float3 pos)
+{
+	return clamp((snoise(pos * 0.02) + 1) * 0.5, 0, 1);
+}
+
+float calculateNoiseVariant(float freq, float3 vertex)
+{
+	return (1 / freq) * noise3D(float3(
+		vertex.x * freq, vertex.y * freq, vertex.z * freq));
+}
+
+float calculateHeight(float3 vertex)
+{
+	float baseHeight = pow((
+		calculateNoiseVariant(  1, vertex) +
+		calculateNoiseVariant(  2, vertex) +
+		calculateNoiseVariant(  4, vertex) +
+		calculateNoiseVariant(  8, vertex) +
+		calculateNoiseVariant( 16, vertex) +
+		calculateNoiseVariant( 32, vertex) +
+		calculateNoiseVariant( 64, vertex) +
+		calculateNoiseVariant(128, vertex)  )
+		/ 2.0,
+		1.55);
+
+	return baseHeight * 59.2;
+}
+
+[numthreads(128,1,1)]
+void TerVertGen(uint3 id : SV_DispatchThreadID)
+{
+	float4 currentVertex = float4(mesh[id.x].x, /*mesh[id.x].y*/ 0, mesh[id.x].z, 1);
+	currentVertex = mul(localToWorldMatrix, currentVertex);
+	mesh[id.x].y =
+		calculateHeight(currentVertex.xyz);
+}
+
